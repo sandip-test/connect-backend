@@ -1,11 +1,11 @@
 /**
- * @enum {string}
- * @description Defines the types of companies.
+ * Enum representing different types of companies/organizations
+ * Used specifically for sponsor registration
  */
 
 export enum CompanyType {
-  Proprietorship = 'Proprietorship',
-  Private = 'Private',
-  Public = 'Public',
-  NGO_INGO = 'NGO/INGO',
+  PROPRIETORSHIP = 'Proprietorship',
+  PRIVATE = 'Private',
+  PUBLIC = 'Public',
+  NGO_INGO = 'NGO/INGO'
 }
