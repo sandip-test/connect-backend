@@ -150,17 +150,17 @@ export class SponsorRegistrationDto {
   @MaxLength(100)
   otherSponsorshipSectors?: string;
 
-//   @ApiProperty({
-//     description: 'Company logo file (image format)',
-//     type: 'string',
-//     format: 'binary'
-//   })
-//   companyLogo: Express.Multer.File;
+  @ApiProperty({
+    description: 'Company logo file (image format)',
+    type: 'string',
+    format: 'binary'
+  })
+  companyLogo: Express.Multer.File;
 
-//   @ApiProperty({
-//     description: 'Company registration certificate (PDF or image)',
-//     type: 'string',
-//     format: 'binary'
-//   })
-//   registrationCertificate: Express.Multer.File;
+  @ApiProperty({
+    description: 'Company registration certificate (PDF or image)',
+    type: 'string',
+    format: 'binary'
+  })
+  registrationCertificate: Express.Multer.File;
 }

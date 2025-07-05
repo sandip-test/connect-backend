@@ -160,17 +160,17 @@ export class OrganizationRegistrationDto {
   @MaxLength(100)
   location: string;
 
-//   @ApiProperty({
-//     description: 'Organization logo file (image format)',
-//     type: 'string',
-//     format: 'binary'
-//   })
-//   organizationLogo: Express.Multer.File;
+  @ApiProperty({
+    description: 'Organization logo file (image format)',
+    type: 'string',
+    format: 'binary'
+  })
+  organizationLogo: Express.Multer.File;
 
-//   @ApiProperty({
-//     description: 'Organization registration certificate (PDF or image)',
-//     type: 'string',
-//     format: 'binary'
-//   })
-//   registrationCertificate: Express.Multer.File;
+  @ApiProperty({
+    description: 'Organization registration certificate (PDF or image)',
+    type: 'string',
+    format: 'binary'
+  })
+  registrationCertificate: Express.Multer.File;
 }
