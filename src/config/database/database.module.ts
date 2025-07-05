@@ -14,11 +14,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         username: configService.get('POSTGRES_USER'),
         password: configService.get('POSTGRES_PASSWORD'),
         database: configService.get('POSTGRES_DB'),
-        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        synchronize: true,
+        entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
+        migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
+        synchronize: process.env.NODE_ENV === 'development',  // Set synchronize to false in production
         ssl: {
           rejectUnauthorized: false,
         },
+        logging: true,
       }),
       inject: [ConfigService],
     }),

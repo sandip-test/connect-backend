@@ -57,6 +57,27 @@ $ pnpm run test:e2e
 $ pnpm run test:cov
 ```
 
+## Migrations
+### Generate a new migration
+```bash
+npm run migration:generate -- src/migrations/MigrationName
+```
+
+### Run migrations
+```bash
+npm run migration:run
+```
+
+### Revert last migration
+```bash
+npm run migration:revert
+```
+
+### Create empty migration file
+```bash
+npm run migration:create -- src/migrations/AddIndexToUserEmail
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
