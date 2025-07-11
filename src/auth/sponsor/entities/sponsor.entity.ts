@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
 import { Sector, CompanyType } from 'src/common/enums';
+import { User } from 'src/modules/user/entity/user.entity';
 
 /**
  * Sponsor Entity
- * Represents sponsors registered in the system
+ * Represents sponsors registered in the system and its relationship with the User entity
  */
 @Entity('sponsors')
 export class Sponsor {
@@ -69,4 +70,8 @@ export class Sponsor {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  //Relationships between Sponsor and User
+  @OneToOne(() => User, user => user.sponsor)
+  user: User;
 }
