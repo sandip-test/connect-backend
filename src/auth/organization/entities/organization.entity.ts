@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Sector , BranchType } from 'src/common/enums';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
+import { Sector, BranchType } from 'src/common/enums';
+import { User } from 'src/modules/user/entity/user.entity';
 
 /**
  * Organization Entity
- * Represents organizations registered in the system
+ * Represents organizations registered in the system and its relationship with the User entity
  */
 @Entity('organizations')
 export class Organization {
@@ -22,7 +23,7 @@ export class Organization {
   @Column({ name: 'head_contact_number', length: 20 })
   headContactNumber: string;
 
-  @Column({ name: 'years_of_establishment', type: 'int' })
+  @Column({ name: 'year_of_establishment', type: 'int' })
   yearsOfEstablishment: number;
 
   @Column({ name: 'registration_number', length: 50, unique: true })
@@ -52,8 +53,14 @@ export class Organization {
   @Column({ name: 'organization_logo_path', length: 255 })
   organizationLogoPath: string;
 
+  @Column({ name: 'organization_logo_public_id', length: 255, nullable: true })
+  organizationLogoPublicId: string;
+
   @Column({ name: 'registration_certificate_path', length: 255 })
   registrationCertificatePath: string;
+
+  @Column({ name: 'registration_certificate_public_id', length: 255, nullable: true })
+  registrationCertificatePublicId: string;
 
   @Column({ name: 'is_verified', default: false })
   isVerified: boolean;
@@ -66,4 +73,9 @@ export class Organization {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // Relationships between Organization and User
+  @OneToOne(() => User, (user) => user.organization)
+  @JoinColumn({ name: 'user_id' }) 
+  user: User;
 }

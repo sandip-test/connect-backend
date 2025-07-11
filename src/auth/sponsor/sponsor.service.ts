@@ -1,15 +1,16 @@
-import { Injectable, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
+import { Repository, DataSource } from 'typeorm';
 import { Sponsor } from './entities/sponsor.entity';
+import { User } from 'src/modules/user/entity/user.entity';
+import {  Sector } from 'src/common/enums';
 import { SponsorRegistrationDto } from './dto/sponsor-registration.dto';
 import { FileUploadService } from 'src/config/upload/file-upload.service';
-
+import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
+import { Role } from 'src/common/enums/role.enum';
 
 /**
  * Service responsible for handling sponsor registration business logic
- * Includes validation, file upload, and database operations
  */
 @Injectable()
 export class SponsorRegistrationService {
@@ -18,41 +19,75 @@ export class SponsorRegistrationService {
   constructor(
     @InjectRepository(Sponsor)
     private readonly sponsorRepository: Repository<Sponsor>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly fileUploadService: FileUploadService,
+    private readonly dataSource: DataSource, // Inject DataSource for transactions
   ) {}
 
   /**
-   * Registers a new sponsor in the system
-   * @param dto Sponsor registration data
-   * @param files Uploaded files (logo and certificate)
-   * @returns Promise<RegistrationResponse> Registration result
-   * @throws BadRequestException If validation fails
-   * @throws ConflictException If sponsor already exists
+   * Registers a new sponsor and its corresponding user account in a transaction.
+   * @param dto - The sponsor registration data transfer object.
+   * @param files - The uploaded files for the company logo and certificate.
+   * @returns A standardized registration response.
    */
   async registerSponsor(
     dto: SponsorRegistrationDto,
-    files: { companyLogo: Express.Multer.File; registrationCertificate: Express.Multer.File }
+    files: { companyLogo: Express.Multer.File; registrationCertificate: Express.Multer.File },
   ): Promise<RegistrationResponse> {
-    this.logger.log(`Starting sponsor registration for: ${dto.companyName}`);
+    this.logger.log(`Registration attempt for sponsor: ${dto.companyName}`);
+
+    // --- Pre-checks for data integrity ---
+    if (dto.otherWorkSectors && !dto.sectorsOfWork.includes(Sector.OTHERS)) {
+      throw new BadRequestException('Cannot provide otherWorkSectors if "OTHERS" is not selected.');
+    }
+    if (dto.otherSponsorshipSectors && !dto.sectorsInterestedToSponsor.includes(Sector.OTHERS)) {
+        throw new BadRequestException('Cannot provide otherSponsorshipSectors if "OTHERS" is not selected.');
+    }
+
+    const existingUser = await this.userRepository.findOne({ where: { email: dto.emailAddress } });
+    if (existingUser) {
+      throw new ConflictException(`User with email "${dto.emailAddress}" already exists.`);
+    }
+
+    const existingSponsor = await this.sponsorRepository.findOne({ where: { registrationNumber: dto.registrationNumber } });
+    if (existingSponsor) {
+      throw new ConflictException(`Sponsor with registration number "${dto.registrationNumber}" already exists.`);
+    }
+    
+    // --- File Uploads ---
+    const uploadedFiles = await this.handleFileUploads(files);
+
+    // --- Transactional Registration ---
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
     try {
-      // Check if sponsor already exists
-      await this.validateUniqueness(dto.registrationNumber, dto.emailAddress);
+      // 1. Create the User entity
+      const user = queryRunner.manager.create(User, {
+        email: dto.emailAddress,
+        password: dto.password, // The @BeforeInsert hook on the User entity will hash this
+        role: Role.SPONSOR,
+        isVerified: false,
+      });
+      const savedUser = await queryRunner.manager.save(user);
 
-      // Validate and upload files
-      const uploadedFiles = await this.handleFileUploads(files);
-
-      // Create sponsor entity
-      const sponsor = this.sponsorRepository.create({
+      // 2. Create the Sponsor profile and link it to the new User
+      const sponsor = queryRunner.manager.create(Sponsor, {
         ...dto,
         companyLogoPath: uploadedFiles.logoPath,
         registrationCertificatePath: uploadedFiles.certificatePath,
+        companyLogoPublicId: uploadedFiles.logoPublicId,
+        registrationCertificatePublicId: uploadedFiles.certificatePublicId,
+        user: savedUser, // Link the sponsor profile to the user
+        isVerified: false,
       });
+      const savedSponsor = await queryRunner.manager.save(sponsor);
 
-      // Save to database
-      const savedSponsor = await this.sponsorRepository.save(sponsor);
-
-      this.logger.log(`Sponsor registered successfully with ID: ${savedSponsor.id}`);
+      // If all operations succeed, commit the transaction
+      await queryRunner.commitTransaction();
+      this.logger.log(`Sponsor and User created successfully. Sponsor ID: ${savedSponsor.id}`);
 
       return {
         success: true,
@@ -60,110 +95,70 @@ export class SponsorRegistrationService {
         data: {
           id: savedSponsor.id,
           companyName: savedSponsor.companyName,
-          emailAddress: savedSponsor.emailAddress,
+          emailAddress: user.email,
           registrationNumber: savedSponsor.registrationNumber,
           isVerified: savedSponsor.isVerified,
           createdAt: savedSponsor.createdAt,
         },
       };
     } catch (error) {
+      // If any error occurs, roll back the entire transaction
+      await queryRunner.rollbackTransaction();
       this.logger.error(`Sponsor registration failed: ${error.message}`, error.stack);
-      
-      if (error instanceof ConflictException || error instanceof BadRequestException) {
-        throw error;
-      }
-      
-      throw new BadRequestException('Sponsor registration failed. Please try again.');
+      throw new BadRequestException('Sponsor registration failed. Please check your data and try again.');
+    } finally {
+      // Always release the query runner to free up the connection
+      await queryRunner.release();
     }
   }
 
   /**
-   * Validates that the sponsor registration number and email are unique
-   * @param registrationNumber Sponsor registration number
-   * @param emailAddress Sponsor email address
-   * @throws ConflictException If sponsor already exists
+   * Handles file uploads for company logo and registration certificate.
+   * @param files - The multer file objects.
+   * @returns A promise with the secure URLs and public IDs of the uploaded files.
    */
-  private async validateUniqueness(registrationNumber: string, emailAddress: string): Promise<void> {
-    const existingSponsor = await this.sponsorRepository.findOne({
-      where: [
-        { registrationNumber },
-        { emailAddress },
-      ],
-    });
+  private async handleFileUploads(files: {
+    companyLogo: Express.Multer.File;
+    registrationCertificate: Express.Multer.File;
+  }): Promise<{ logoPath: string; certificatePath: string; logoPublicId: string; certificatePublicId: string }> {
+    try {
+      const [logoResult, certificateResult] = await Promise.all([
+        this.fileUploadService.uploadFile(files.companyLogo, 'sponsor-logos', ['image/jpeg', 'image/png', 'image/jpg'], 5 * 1024 * 1024),
+        this.fileUploadService.uploadFile(files.registrationCertificate, 'sponsor-certificates', ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'], 10 * 1024 * 1024),
+      ]);
 
-    if (existingSponsor) {
-      if (existingSponsor.registrationNumber === registrationNumber) {
-        throw new ConflictException('Sponsor with this registration number already exists');
-      }
-      if (existingSponsor.emailAddress === emailAddress) {
-        throw new ConflictException('Sponsor with this email address already exists');
-      }
+      return {
+        logoPath: logoResult.secure_url,
+        certificatePath: certificateResult.secure_url,
+        logoPublicId: logoResult.public_id,
+        certificatePublicId: certificateResult.public_id,
+      };
+    } catch (error) {
+      this.logger.error(`File upload failed during sponsor registration: ${error.message}`, error.stack);
+      throw new BadRequestException('File upload failed. Please ensure files meet the type and size requirements.');
     }
   }
 
-/**
- * Handles file uploads for company logo and registration certificate
- * @param files Uploaded files
- * @returns Promise<{logoPath: string, certificatePath: string}> File paths
- * @throws BadRequestException If file upload fails
- */
-private async handleFileUploads(files: {
-  companyLogo: Express.Multer.File;
-  registrationCertificate: Express.Multer.File;
-}): Promise<{ logoPath: string; certificatePath: string; logoPublicId: string; certificatePublicId: string }> {
-  try {
-    // Upload company logo
-    const logoResult = await this.fileUploadService.uploadFile(
-      files.companyLogo,
-      'sponsor-logos',
-      ['image/jpeg', 'image/png', 'image/jpg'],
-      5 * 1024 * 1024 // 5MB limit
-    );
-
-    // Upload registration certificate
-    const certificateResult = await this.fileUploadService.uploadFile(
-      files.registrationCertificate,
-      'sponsor-certificates',
-      ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
-      10 * 1024 * 1024 // 10MB limit
-    );
-
-    return { 
-      logoPath: logoResult.secure_url, 
-      certificatePath: certificateResult.secure_url,
-      logoPublicId: logoResult.public_id,
-      certificatePublicId: certificateResult.public_id
-    };
-  } catch (error) {
-    this.logger.error(`File upload failed: ${error.message}`, error.stack);
-    throw new BadRequestException('File upload failed. Please ensure files meet the requirements.');
-  }
-}
-
   /**
-   * Retrieves sponsor by ID
-   * @param id Sponsor ID
-   * @returns Promise<Sponsor> Sponsor entity
+   * Retrieves a single sponsor by their ID.
+   * @param id The UUID of the sponsor.
+   * @returns The sponsor entity.
    */
   async getSponsorById(id: string): Promise<Sponsor> {
-    const sponsor = await this.sponsorRepository.findOne({
-      where: { id },
-    });
-
+    const sponsor = await this.sponsorRepository.findOne({ where: { id } });
     if (!sponsor) {
-      throw new BadRequestException('Sponsor not found');
+      throw new NotFoundException(`Sponsor with ID "${id}" not found.`);
     }
-
     return sponsor;
   }
 
   /**
-   * Retrieves all sponsors with pagination
-   * @param page Page number (default: 1)
-   * @param limit Items per page (default: 10)
-   * @returns Promise<{sponsors: Sponsor[], total: number, page: number, limit: number}>
+   * Retrieves all sponsors with pagination.
+   * @param page - The page number for pagination.
+   * @param limit - The number of items per page.
+   * @returns A paginated list of sponsors.
    */
-  async getAllSponsors(page: number = 1, limit: number = 10) {
+  async getAllSponsors(page: number, limit: number) {
     const [sponsors, total] = await this.sponsorRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
@@ -171,7 +166,7 @@ private async handleFileUploads(files: {
     });
 
     return {
-      sponsors,
+      data: sponsors,
       total,
       page,
       limit,

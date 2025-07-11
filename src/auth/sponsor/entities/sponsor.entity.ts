@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Sector , CompanyType } from 'src/common/enums';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
+import { Sector, CompanyType } from 'src/common/enums';
+import { User } from 'src/modules/user/entity/user.entity';
 
 /**
  * Sponsor Entity
- * Represents sponsors registered in the system
+ * Represents sponsors registered in the system and its relationship with the User entity
  */
 @Entity('sponsors')
 export class Sponsor {
@@ -16,7 +17,7 @@ export class Sponsor {
   @Column({ name: 'company_type', type: 'enum', enum: CompanyType })
   companyType: CompanyType;
 
-  @Column({ name: 'years_of_establishment', type: 'int' })
+  @Column({ name: 'year_of_establishment', type: 'int' }) 
   yearsOfEstablishment: number;
 
   @Column({ name: 'registration_number', length: 50, unique: true })
@@ -49,8 +50,14 @@ export class Sponsor {
   @Column({ name: 'company_logo_path', length: 255 })
   companyLogoPath: string;
 
+  @Column({ name: 'company_logo_public_id', length: 255, nullable: true })
+  companyLogoPublicId: string;
+
   @Column({ name: 'registration_certificate_path', length: 255 })
   registrationCertificatePath: string;
+
+  @Column({ name: 'registration_certificate_public_id', length: 255, nullable: true })
+  registrationCertificatePublicId: string;
 
   @Column({ name: 'is_verified', default: false })
   isVerified: boolean;
@@ -63,4 +70,9 @@ export class Sponsor {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  //Relationships between Sponsor and User
+  @OneToOne(() => User, (user) => user.sponsor)
+  @JoinColumn({ name: 'user_id' }) 
+  user: User;
 }
