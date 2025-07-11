@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Sector , CompanyType } from 'src/common/enums';
+import { Sector, CompanyType } from 'src/common/enums';
 
 /**
  * Sponsor Entity
@@ -16,7 +16,7 @@ export class Sponsor {
   @Column({ name: 'company_type', type: 'enum', enum: CompanyType })
   companyType: CompanyType;
 
-  @Column({ name: 'years_of_establishment', type: 'int' })
+  @Column({ name: 'year_of_establishment', type: 'int' }) 
   yearsOfEstablishment: number;
 
   @Column({ name: 'registration_number', length: 50, unique: true })
@@ -49,8 +49,14 @@ export class Sponsor {
   @Column({ name: 'company_logo_path', length: 255 })
   companyLogoPath: string;
 
+  @Column({ name: 'company_logo_public_id', length: 255, nullable: true })
+  companyLogoPublicId: string;
+
   @Column({ name: 'registration_certificate_path', length: 255 })
   registrationCertificatePath: string;
+
+  @Column({ name: 'registration_certificate_public_id', length: 255, nullable: true })
+  registrationCertificatePublicId: string;
 
   @Column({ name: 'is_verified', default: false })
   isVerified: boolean;

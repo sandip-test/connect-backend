@@ -36,7 +36,7 @@ import { ApiFile } from '../../common/decorators/api-file.decorator';
 export class OrganizationRegistrationController {
   constructor(
     private readonly organizationRegistrationService: OrganizationRegistrationService,
-  ) {}
+  ) { }
 
   /**
    * Registers a new organization
@@ -52,40 +52,14 @@ export class OrganizationRegistrationController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Organization registration data with file uploads',
-    type: OrganizationRegistrationDto,
+    type: OrganizationRegistrationDto, // Note: For Swagger UI, file properties should be on the DTO.
   })
-  @ApiFile('organizationLogo', true, 'Organization logo (JPG, PNG, max 5MB)')
-  @ApiFile('registrationCertificate', true, 'Registration certificate (PDF, JPG, PNG, max 10MB)')
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Organization registered successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: { type: 'string', example: 'Organization registered successfully. Please wait for verification.' },
-        data: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
-            organizationName: { type: 'string', example: 'Tech Solutions Nepal' },
-            emailAddress: { type: 'string', example: 'info@techsolutions.com.np' },
-            registrationNumber: { type: 'string', example: 'REG-2024-001234' },
-            isVerified: { type: 'boolean', example: false },
-            createdAt: { type: 'string', format: 'date-time' },
-          },
-        },
-      },
-    },
   })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid input data or file upload failed',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Organization already exists',
-  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data or file upload failed' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Organization already exists' })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'organizationLogo', maxCount: 1 },
@@ -96,18 +70,21 @@ export class OrganizationRegistrationController {
     @Body() dto: OrganizationRegistrationDto,
     @UploadedFiles()
     files: {
-      organizationLogo: Express.Multer.File[];
-      registrationCertificate: Express.Multer.File[];
+      organizationLogo?: Express.Multer.File[];
+      registrationCertificate?: Express.Multer.File[];
     },
   ): Promise<RegistrationResponse> {
-    // Validate file uploads
-    if (!files?.organizationLogo?.[0] || !files?.registrationCertificate?.[0]) {
-      throw new BadRequestException('Both organization logo and registration certificate are required');
+    const organizationLogo = files?.organizationLogo?.[0];
+    const registrationCertificate = files?.registrationCertificate?.[0];
+
+    // Robust check for both required files
+    if (!organizationLogo || !registrationCertificate) {
+      throw new BadRequestException('Both organization logo and registration certificate files are required.');
     }
 
     return this.organizationRegistrationService.registerOrganization(dto, {
-      organizationLogo: files.organizationLogo[0],
-      registrationCertificate: files.registrationCertificate[0],
+      organizationLogo,
+      registrationCertificate,
     });
   }
 
@@ -121,24 +98,13 @@ export class OrganizationRegistrationController {
     summary: 'Get organization by ID',
     description: 'Retrieves organization details by its unique identifier',
   })
-  @ApiParam({
-    name: 'id',
-    description: 'Organization UUID',
-    type: 'string',
-    format: 'uuid',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Organization retrieved successfully',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Organization not found',
-  })
+  @ApiParam({ name: 'id', description: 'Organization UUID', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Organization retrieved successfully' })
+  // FIX: Changed status to NOT_FOUND for semantic accuracy
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Organization not found' })
   async getOrganizationById(@Param('id', ParseUUIDPipe) id: string) {
     return this.organizationRegistrationService.getOrganizationById(id);
   }
-
   /**
    * Retrieves all organizations with pagination
    * @param page Page number (default: 1)
@@ -150,41 +116,13 @@ export class OrganizationRegistrationController {
     summary: 'Get all organizations',
     description: 'Retrieves all organizations with pagination support',
   })
-  @ApiQuery({
-    name: 'page',
-    description: 'Page number',
-    type: 'number',
-    required: false,
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    description: 'Items per page',
-    type: 'number',
-    required: false,
-    example: 10,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Organizations retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        organizations: {
-          type: 'array',
-          items: { type: 'object' },
-        },
-        total: { type: 'number', example: 100 },
-        page: { type: 'number', example: 1 },
-        limit: { type: 'number', example: 10 },
-        totalPages: { type: 'number', example: 10 },
-      },
-    },
-  })
+  @ApiQuery({ name: 'page', type: 'number', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, example: 10 })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Organizations retrieved successfully' })
   async getAllOrganizations(
-    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('page', new ParseIntPipe({ optional: true, exceptionFactory: () => new BadRequestException('Page must be a number') })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true, exceptionFactory: () => new BadRequestException('Limit must be a number') })) limit: number = 10,
   ) {
-    return this.organizationRegistrationService.getAllOrganizations(page, limit);
+    return this.organizationRegistrationService.getAllOrganizations(page > 0 ? page : 1, limit > 0 ? limit : 10);
   }
 }

@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Sector , BranchType } from 'src/common/enums';
+import { Sector, BranchType } from 'src/common/enums';
 
 /**
  * Organization Entity
@@ -22,7 +22,7 @@ export class Organization {
   @Column({ name: 'head_contact_number', length: 20 })
   headContactNumber: string;
 
-  @Column({ name: 'years_of_establishment', type: 'int' })
+  @Column({ name: 'year_of_establishment', type: 'int' }) 
   yearsOfEstablishment: number;
 
   @Column({ name: 'registration_number', length: 50, unique: true })
@@ -52,8 +52,14 @@ export class Organization {
   @Column({ name: 'organization_logo_path', length: 255 })
   organizationLogoPath: string;
 
+  @Column({ name: 'organization_logo_public_id', length: 255, nullable: true })
+  organizationLogoPublicId: string;
+
   @Column({ name: 'registration_certificate_path', length: 255 })
   registrationCertificatePath: string;
+
+  @Column({ name: 'registration_certificate_public_id', length: 255, nullable: true })
+  registrationCertificatePublicId: string;
 
   @Column({ name: 'is_verified', default: false })
   isVerified: boolean;
