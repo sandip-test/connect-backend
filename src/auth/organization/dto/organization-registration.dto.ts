@@ -19,12 +19,13 @@ import {
 import { Type } from 'class-transformer';
 import { Sector, BranchType } from 'src/common/enums';
 import { IsPhone } from 'src/common/validators/is-phone.validator';
+import { PasswordDto } from 'src/auth/dto/password.dto';
 
 /**
  * Data Transfer Object for Organization Registration
  * Contains all required fields and validation rules for organization registration
  */
-export class OrganizationRegistrationDto {
+export class OrganizationRegistrationDto extends PasswordDto {
   @ApiProperty({
     description: 'Name of the organization',
     example: 'Sayapatri Group',

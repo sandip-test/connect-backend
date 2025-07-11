@@ -19,12 +19,13 @@ import {
 import { Type } from 'class-transformer';
 import { Sector, CompanyType } from 'src/common/enums';
 import { IsPhone } from 'src/common/validators/is-phone.validator';
+import { PasswordDto } from 'src/auth/dto/password.dto';
 
 /**
  * Data Transfer Object for Sponsor Registration
  * Contains all required fields and validation rules for sponsor registration
  */
-export class SponsorRegistrationDto {
+export class SponsorRegistrationDto extends PasswordDto {
   @ApiProperty({ description: 'Name of the sponsoring company', example: 'Nepal Investment Bank Ltd.', minLength: 2, maxLength: 100 })
   @IsString()
   @IsNotEmpty()

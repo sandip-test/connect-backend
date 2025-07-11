@@ -1,15 +1,14 @@
 import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Organization } from './entities/organization.entity';
-import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
+import { User } from 'src/modules/user/entity/user.entity';
+import { Sector } from 'src/common/enums';
+import { Role } from 'src/common/enums/role.enum';
 import { OrganizationRegistrationDto } from './dto/organization-registration.dto';
 import { FileUploadService } from 'src/config/upload/file-upload.service';
-import { Sector } from 'src/common/enums';
+import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
 
-/**
- * Service responsible for handling organization registration business logic
- */
 @Injectable()
 export class OrganizationRegistrationService {
   private readonly logger = new Logger(OrganizationRegistrationService.name);
@@ -17,38 +16,67 @@ export class OrganizationRegistrationService {
   constructor(
     @InjectRepository(Organization)
     private readonly organizationRepository: Repository<Organization>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly fileUploadService: FileUploadService,
-  ) {}
+    private readonly dataSource: DataSource, // Inject DataSource for transactions
+  ) { }
 
-  /**
-   * Registers a new organization in the system
-   */
   async registerOrganization(
     dto: OrganizationRegistrationDto,
     files: { organizationLogo: Express.Multer.File; registrationCertificate: Express.Multer.File },
   ): Promise<RegistrationResponse> {
-    this.logger.log(`Starting organization registration for: ${dto.organizationName}`);
+    this.logger.log(`Registration attempt for organization: ${dto.organizationName}`);
 
-    // Validate that 'otherSectors' is not provided if 'OTHERS' is not a chosen sector
+    // --- Pre-checks ---
     if (dto.otherSectors && !dto.sectorsYouWorkIn.includes(Sector.OTHERS)) {
-      throw new BadRequestException('Cannot provide otherSectors without selecting the "OTHERS" sector.');
+      throw new BadRequestException('Cannot provide otherSectors if "OTHERS" is not selected.');
     }
 
+    const existingUser = await this.userRepository.findOne({ where: { email: dto.emailAddress } });
+    if (existingUser) {
+      throw new ConflictException(`User with email "${dto.emailAddress}" already exists.`);
+    }
+
+    const existingOrg = await this.organizationRepository.findOne({ where: { registrationNumber: dto.registrationNumber } });
+    if (existingOrg) {
+      throw new ConflictException(`Organization with registration number "${dto.registrationNumber}" already exists.`);
+    }
+
+    // --- File Uploads ---
+    const uploadedFiles = await this.handleFileUploads(files);
+
+    // --- Transactional Operation ---
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      await this.validateUniqueness(dto.registrationNumber, dto.emailAddress);
+      // 1. Create the User
+      const user = queryRunner.manager.create(User, {
+        email: dto.emailAddress,
+        password: dto.password, // Password will be hashed by the @BeforeInsert hook
+        role: Role.ORGANIZATION,
+        isVerified: false,
+      });
+      const savedUser = await queryRunner.manager.save(user);
 
-      const uploadedFiles = await this.handleFileUploads(files);
-
-      const organization = this.organizationRepository.create({
+      // 2. Create the Organization Profile and link it to the User
+      const organization = queryRunner.manager.create(Organization, {
         ...dto,
         organizationLogoPath: uploadedFiles.logoPath,
         registrationCertificatePath: uploadedFiles.certificatePath,
         organizationLogoPublicId: uploadedFiles.logoPublicId,
         registrationCertificatePublicId: uploadedFiles.certificatePublicId,
+        user: savedUser, // Link to the user
+        isVerified: false,
       });
 
-      const savedOrganization = await this.organizationRepository.save(organization);
-      this.logger.log(`Organization registered successfully with ID: ${savedOrganization.id}`);
+      const savedOrganization = await queryRunner.manager.save(organization);
+
+      // Commit the transaction
+      await queryRunner.commitTransaction();
+      this.logger.log(`Organization and User created successfully. Org ID: ${savedOrganization.id}`);
 
       return {
         success: true,
@@ -56,38 +84,20 @@ export class OrganizationRegistrationService {
         data: {
           id: savedOrganization.id,
           organizationName: savedOrganization.organizationName,
-          emailAddress: savedOrganization.emailAddress,
+          emailAddress: user.email,
           registrationNumber: savedOrganization.registrationNumber,
           isVerified: savedOrganization.isVerified,
           createdAt: savedOrganization.createdAt,
         },
       };
     } catch (error) {
-      this.logger.error(`Organization registration failed: ${error.message}`, error.stack);
-      // Re-throw known exceptions directly
-      if (error instanceof ConflictException || error instanceof BadRequestException || error instanceof NotFoundException) {
-        throw error;
-      }
-      // Generic error for unknown issues
-      throw new BadRequestException('Organization registration failed. Please try again.');
-    }
-  }
-
-  /**
-   * Validates that the organization registration number and email are unique
-   */
-  private async validateUniqueness(registrationNumber: string, emailAddress: string): Promise<void> {
-    const existingOrg = await this.organizationRepository.findOne({
-      where: [{ registrationNumber }, { emailAddress }],
-    });
-
-    if (existingOrg) {
-      if (existingOrg.registrationNumber === registrationNumber) {
-        throw new ConflictException(`Organization with registration number "${registrationNumber}" already exists.`);
-      }
-      if (existingOrg.emailAddress === emailAddress) {
-        throw new ConflictException(`Organization with email address "${emailAddress}" already exists.`);
-      }
+      // Rollback transaction on error
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Registration failed: ${error.message}`, error.stack);
+      throw new BadRequestException('Organization registration failed. Please check your data.');
+    } finally {
+      // Release the query runner
+      await queryRunner.release();
     }
   }
 
@@ -115,6 +125,7 @@ export class OrganizationRegistrationService {
       this.logger.error(`File upload failed: ${error.message}`, error.stack);
       throw new BadRequestException('File upload failed. Please ensure files meet the type and size requirements.');
     }
+
   }
 
   /**

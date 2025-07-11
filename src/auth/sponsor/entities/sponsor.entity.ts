@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
 import { Sector, CompanyType } from 'src/common/enums';
 import { User } from 'src/modules/user/entity/user.entity';
 
@@ -72,6 +72,7 @@ export class Sponsor {
   updatedAt: Date;
 
   //Relationships between Sponsor and User
-  @OneToOne(() => User, user => user.sponsor)
+  @OneToOne(() => User, (user) => user.sponsor)
+  @JoinColumn({ name: 'user_id' }) 
   user: User;
 }

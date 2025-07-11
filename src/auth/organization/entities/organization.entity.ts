@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
 import { Sector, BranchType } from 'src/common/enums';
 import { User } from 'src/modules/user/entity/user.entity';
 
@@ -75,6 +75,7 @@ export class Organization {
   updatedAt: Date;
 
   // Relationships between Organization and User
-  @OneToOne(() => User, user => user.organization)
+  @OneToOne(() => User, (user) => user.organization)
+  @JoinColumn({ name: 'user_id' }) 
   user: User;
 }
