@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AdminSeedService } from './modules/admin/seed/admin-seed.service';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +11,12 @@ async function bootstrap() {
   const adminSeeder = app.get(AdminSeedService);
   await adminSeeder.seedAdmin();
   // -----------------------------
+
+    // Enable global validation pipe
+  app.useGlobalPipes(new ValidationPipe());
+
+  // Enable CORS
+  app.enableCors();
 
   const config = new DocumentBuilder()
     .setTitle('Sayapatri API')
