@@ -1,48 +1,35 @@
-name: Build and Deploy to Azure App Service
+name: CI for Render
 
 on:
   push:
     branches:
-      - main 
+      - main
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME || 'sayapatri-api' }} 
   NODE_VERSION: '18.x'
 
 jobs:
-  build-and-deploy:
+  ci:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout Github Action'
+      - name: 'Checkout code'
         uses: actions/checkout@v3
 
       - name: 'Set up Node.js'
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: 'pnpm'
+
+      - name: 'Install pnpm'
+        run: npm install -g pnpm
 
       - name: 'Install dependencies'
-        run: npm install
+        run: pnpm install
 
       - name: 'Build the application'
-        run: npm run build --if-present
-        
+        run: pnpm run build --if-present
+
       - name: 'Run tests'
-        run: npm run test --if-present
-
-      - name: 'Install production dependencies'
-        run: |
-          rm -rf node_modules
-          npm install --only=production --ignore-scripts
-
-      - name: 'Zip artifact for deployment'
-        run: zip -r release.zip . -x ".git/*" ".github/*" ".vscode/*" "src/*" "test/*"
-
-      - name: 'Deploy to Azure Web App'
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # Alternative to credentials
-          package: 'release.zip'
+        run: pnpm run test --if-present
