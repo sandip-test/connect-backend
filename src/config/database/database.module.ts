@@ -16,7 +16,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         database: configService.get('POSTGRES_DB'),
         entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
         migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV')?.trim().toLowerCase() !== 'production',
+        synchronize: false,
+        // synchronize: configService.get('NODE_ENV')?.trim().toLowerCase() !== 'production',
         ssl: {
           rejectUnauthorized: false,
         },

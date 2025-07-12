@@ -20,6 +20,8 @@ import { Type } from 'class-transformer';
 import { Sector, BranchType } from 'src/common/enums';
 import { IsPhone } from 'src/common/validators/is-phone.validator';
 import { PasswordDto } from 'src/auth/dto/password.dto';
+import { Transform } from 'class-transformer'; 
+
 
 /**
  * Data Transfer Object for Organization Registration
@@ -105,6 +107,12 @@ export class OrganizationRegistrationDto extends PasswordDto {
     enum: Sector,
     isArray: true,
   })
+    @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.split(',').map(item => item.trim());
+    }
+    return value;
+  })
   @IsArray()
   @ArrayNotEmpty({ message: 'At least one sector must be selected' })
   @ArrayMinSize(1)
@@ -116,6 +124,7 @@ export class OrganizationRegistrationDto extends PasswordDto {
     example: 'Renewable Energy',
     maxLength: 100,
   })
+  
   // FIX: Added conditional validation. This field is now required if Sector.OTHERS is selected.
   @ValidateIf((o) => o.sectorsYouWorkIn?.includes(Sector.OTHERS))
   @IsNotEmpty({ message: 'Other sectors cannot be empty when "Others" is selected' })
