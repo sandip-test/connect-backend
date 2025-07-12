@@ -20,6 +20,7 @@ import { Type } from 'class-transformer';
 import { Sector, CompanyType } from 'src/common/enums';
 import { IsPhone } from 'src/common/validators/is-phone.validator';
 import { PasswordDto } from 'src/auth/dto/password.dto';
+import { Transform } from 'class-transformer';
 
 /**
  * Data Transfer Object for Sponsor Registration
@@ -75,6 +76,7 @@ export class SponsorRegistrationDto extends PasswordDto {
   companyWebsite: string;
 
   @ApiProperty({ description: 'Sectors that the company works in', example: [Sector.TECHNOLOGY, Sector.HEALTH], enum: Sector, isArray: true })
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map(item => item.trim()) : value))
   @IsArray()
   @ArrayNotEmpty({ message: 'At least one work sector must be selected' })
   @ArrayMinSize(1)
@@ -90,6 +92,7 @@ export class SponsorRegistrationDto extends PasswordDto {
   otherWorkSectors?: string;
 
   @ApiProperty({ description: 'Sectors the company is interested in sponsoring', example: [Sector.EDUCATION, Sector.ENVIRONMENT], enum: Sector, isArray: true })
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map(item => item.trim()) : value))
   @IsArray()
   @ArrayNotEmpty({ message: 'At least one sponsorship sector must be selected' })
   @ArrayMinSize(1)
