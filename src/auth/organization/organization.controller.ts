@@ -11,6 +11,9 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   BadRequestException,
+  Patch,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import {
@@ -25,7 +28,9 @@ import {
 import { OrganizationRegistrationService } from './organization.service';
 import { OrganizationRegistrationDto } from './dto/organization-registration.dto';
 import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
-import { ApiFile } from '../../common/decorators/api-file.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/config/guards/jwt-auth.guard';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 /**
  * Controller handling organization registration endpoints
@@ -124,5 +129,40 @@ export class OrganizationRegistrationController {
     @Query('limit', new ParseIntPipe({ optional: true, exceptionFactory: () => new BadRequestException('Limit must be a number') })) limit: number = 10,
   ) {
     return this.organizationRegistrationService.getAllOrganizations(page > 0 ? page : 1, limit > 0 ? limit : 10);
+  }
+
+  /**
+  * Updates an existing organization's profile
+  */
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update an organization profile' })
+  @ApiBearerAuth() // Indicates that JWT is required for this endpoint
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Organization updated successfully.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Organization not found.' })
+  @UseGuards(JwtAuthGuard) // Secure this endpoint
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'organizationLogo', maxCount: 1 },
+      { name: 'registrationCertificate', maxCount: 1 },
+    ]),
+  )
+  async updateOrganization(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOrganizationDto,
+    @Request() req: any, // req.user will be populated by JwtAuthGuard
+    @UploadedFiles() files: {
+      organizationLogo?: Express.Multer.File[];
+      registrationCertificate?: Express.Multer.File[];
+    },
+  ) {
+    const organizationLogo = files?.organizationLogo?.[0];
+    const registrationCertificate = files?.registrationCertificate?.[0];
+
+    return this.organizationRegistrationService.updateOrganization(id, dto, req.user, {
+      organizationLogo,
+      registrationCertificate,
+    });
   }
 }

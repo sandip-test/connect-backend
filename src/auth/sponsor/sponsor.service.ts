@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException,ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Sponsor } from './entities/sponsor.entity';
@@ -8,6 +8,8 @@ import { SponsorRegistrationDto } from './dto/sponsor-registration.dto';
 import { FileUploadService } from 'src/config/upload/file-upload.service';
 import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
 import { Role } from 'src/common/enums/role.enum';
+import { UpdateSponsorDto } from './dto/update-sponsor.dto';
+
 
 /**
  * Service responsible for handling sponsor registration business logic
@@ -172,5 +174,65 @@ export class SponsorRegistrationService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Updates a sponsor's profile.
+   * Only the sponsor itself or an admin can perform this action.
+   * @param id - The ID of the sponsor to update.
+   * @param dto - The data to update.
+   * @param loggedInUser - The user performing the request.
+   * @param files - Optional new logo and certificate files.
+   * @returns The updated sponsor entity.
+   */
+  async updateSponsor(
+    id: string,
+    dto: UpdateSponsorDto,
+    loggedInUser: { userId: string; role: Role },
+    files?: {
+      companyLogo?: Express.Multer.File;
+      registrationCertificate?: Express.Multer.File;
+    },
+  ) {
+    this.logger.log(`Update attempt for sponsor ID: ${id}`);
+    const sponsor = await this.sponsorRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException(`Sponsor with ID "${id}" not found.`);
+    }
+
+    // --- Authorization Check ---
+    if (loggedInUser.role !== Role.ADMIN && sponsor.user.id !== loggedInUser.userId) {
+      throw new ForbiddenException('You are not authorized to update this sponsor.');
+    }
+
+    // --- Optional File Uploads ---
+    if (files?.companyLogo) {
+      if (sponsor.companyLogoPublicId) {
+        await this.fileUploadService.deleteFile(sponsor.companyLogoPublicId);
+      }
+      const logoResult = await this.fileUploadService.uploadFile(files.companyLogo, 'sponsor-logos', ['image/jpeg', 'image/png'], 5 * 1024 * 1024);
+      sponsor.companyLogoPath = logoResult.secure_url;
+      sponsor.companyLogoPublicId = logoResult.public_id;
+    }
+
+    if (files?.registrationCertificate) {
+      if (sponsor.registrationCertificatePublicId) {
+        await this.fileUploadService.deleteFile(sponsor.registrationCertificatePublicId);
+      }
+      const certResult = await this.fileUploadService.uploadFile(files.registrationCertificate, 'sponsor-certificates', ['application/pdf', 'image/jpeg', 'image/png'], 10 * 1024 * 1024);
+      sponsor.registrationCertificatePath = certResult.secure_url;
+      sponsor.registrationCertificatePublicId = certResult.public_id;
+    }
+
+    // Merge and save the updated data
+    const updatedSponsor = this.sponsorRepository.merge(sponsor, dto);
+    await this.sponsorRepository.save(updatedSponsor);
+
+    this.logger.log(`Sponsor updated successfully: ${id}`);
+    return updatedSponsor;
   }
 }

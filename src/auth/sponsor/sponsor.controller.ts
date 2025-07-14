@@ -11,6 +11,9 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   BadRequestException,
+  Patch,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import {
@@ -25,7 +28,9 @@ import {
 import { SponsorRegistrationDto } from './dto/sponsor-registration.dto';
 import { SponsorRegistrationService } from './sponsor.service';
 import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
-import { ApiFile } from '../../common/decorators/api-file.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/config/guards/jwt-auth.guard';
+import { UpdateSponsorDto } from './dto/update-sponsor.dto';
 
 /**
  * Controller handling sponsor registration endpoints
@@ -36,7 +41,7 @@ import { ApiFile } from '../../common/decorators/api-file.decorator';
 export class SponsorRegistrationController {
   constructor(
     private readonly sponsorRegistrationService: SponsorRegistrationService,
-  ) {}
+  ) { }
 
   /**
    * Registers a new sponsor
@@ -44,7 +49,7 @@ export class SponsorRegistrationController {
    * @param files Uploaded files (logo and certificate)
    * @returns Promise<RegistrationResponse> Registration result
    */
- @Post('register')
+  @Post('register')
   @ApiOperation({ summary: 'Register a new sponsor' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: SponsorRegistrationDto })
@@ -102,7 +107,41 @@ export class SponsorRegistrationController {
     @Query('page', new ParseIntPipe({ optional: true, exceptionFactory: () => new BadRequestException('Page must be a number') })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true, exceptionFactory: () => new BadRequestException('Limit must be a number') })) limit: number = 10,
   ) {
-    // FIX: Ensure page and limit are positive integers
     return this.sponsorRegistrationService.getAllSponsors(page > 0 ? page : 1, limit > 0 ? limit : 10);
+  }
+
+  /**
+   * Updates an existing sponsor's profile
+   */
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a sponsor profile' })
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Sponsor updated successfully.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Sponsor not found.' })
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'companyLogo', maxCount: 1 },
+      { name: 'registrationCertificate', maxCount: 1 },
+    ]),
+  )
+  async updateSponsor(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSponsorDto,
+    @Request() req: any,
+    @UploadedFiles() files: {
+      companyLogo?: Express.Multer.File[];
+      registrationCertificate?: Express.Multer.File[];
+    },
+  ) {
+    const companyLogo = files?.companyLogo?.[0];
+    const registrationCertificate = files?.registrationCertificate?.[0];
+
+    return this.sponsorRegistrationService.updateSponsor(id, dto, req.user, {
+      companyLogo,
+      registrationCertificate,
+    });
   }
 }

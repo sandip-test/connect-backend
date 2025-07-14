@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException,ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Organization } from './entities/organization.entity';
@@ -8,6 +8,7 @@ import { Role } from 'src/common/enums/role.enum';
 import { OrganizationRegistrationDto } from './dto/organization-registration.dto';
 import { FileUploadService } from 'src/config/upload/file-upload.service';
 import { RegistrationResponse } from 'src/common/interfaces/registration-response.interface';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 @Injectable()
 export class OrganizationRegistrationService {
@@ -160,4 +161,66 @@ export class OrganizationRegistrationService {
       totalPages: Math.ceil(total / limit),
     };
   }
+
+   /**
+   * Updates an organization's profile.
+   * Only the organization itself or an admin can perform this action.
+   * @param id - The ID of the organization to update.
+   * @param dto - The data to update.
+   * @param loggedInUser - The user performing the request.
+   * @param files - Optional new logo and certificate files.
+   * @returns The updated organization entity.
+   */
+  async updateOrganization(
+    id: string,
+    dto: UpdateOrganizationDto,
+    loggedInUser: { userId: string; role: Role },
+    files?: {
+      organizationLogo?: Express.Multer.File;
+      registrationCertificate?: Express.Multer.File;
+    },
+  ) {
+    this.logger.log(`Update attempt for organization ID: ${id}`);
+    const organization = await this.organizationRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!organization) {
+      throw new NotFoundException(`Organization with ID "${id}" not found.`);
+    }
+
+    // --- Authorization Check ---
+    if (loggedInUser.role !== Role.ADMIN && organization.user.id !== loggedInUser.userId) {
+      throw new ForbiddenException('You are not authorized to update this organization.');
+    }
+
+    // --- Optional File Uploads ---
+    if (files?.organizationLogo) {
+      // Optional: Delete the old file from Cloudinary 
+      if (organization.organizationLogoPublicId) {
+        await this.fileUploadService.deleteFile(organization.organizationLogoPublicId);
+      }
+      const logoResult = await this.fileUploadService.uploadFile(files.organizationLogo, 'organization-logos', ['image/jpeg', 'image/png'], 5 * 1024 * 1024);
+      organization.organizationLogoPath = logoResult.secure_url;
+      organization.organizationLogoPublicId = logoResult.public_id;
+    }
+
+    if (files?.registrationCertificate) {
+      if (organization.registrationCertificatePublicId) {
+        await this.fileUploadService.deleteFile(organization.registrationCertificatePublicId);
+      }
+      const certResult = await this.fileUploadService.uploadFile(files.registrationCertificate, 'organization-certificates', ['application/pdf', 'image/jpeg', 'image/png'], 10 * 1024 * 1024);
+      organization.registrationCertificatePath = certResult.secure_url;
+      organization.registrationCertificatePublicId = certResult.public_id;
+    }
+
+    // Merge and save the updated data
+    const updatedOrganization = this.organizationRepository.merge(organization, dto);
+    await this.organizationRepository.save(updatedOrganization);
+    
+    this.logger.log(`Organization updated successfully: ${id}`);
+    return updatedOrganization;
+  }
+
 }
