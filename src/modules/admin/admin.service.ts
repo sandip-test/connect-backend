@@ -71,4 +71,27 @@ export class AdminService {
     this.logger.log(`Sponsor verified successfully: ${id}`);
     return { message: 'Sponsor verified successfully.' };
   }
+
+  async deleteSponsor(id: string): Promise<{ message: string }> {
+    const sponsor = await this.sponsorRepository.findOne({ where: { id } });
+
+    if (!sponsor) {
+      throw new NotFoundException(`Sponsor with ID "${id}" not found.`);
+    }
+
+    await this.sponsorRepository.remove(sponsor);
+    this.logger.log(`Sponsor deleted successfully: ${id}`);
+    return { message: 'Sponsor deleted successfully.' };
+  }
+  async deleteOrganization(id: string): Promise<{ message: string }> {
+    const organization = await this.organizationRepository.findOne({ where: { id } });
+
+    if (!organization) {
+      throw new NotFoundException(`Organization with ID "${id}" not found.`);
+    }
+
+    await this.organizationRepository.remove(organization);
+    this.logger.log(`Organization deleted successfully: ${id}`);
+    return { message: 'Organization deleted successfully.' };
+  }
 }

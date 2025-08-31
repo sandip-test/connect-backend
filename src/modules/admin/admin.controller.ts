@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, Patch, UseGuards, HttpStatus, ParseUUIDPipe, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { Role } from 'src/common/enums/role.enum';
@@ -45,4 +45,21 @@ export class AdminController {
   verifySponsor(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.verifySponsor(id);
   }
+
+  @Delete('sponsors/:id')
+  @ApiOperation({ summary: 'Delete a sponsor' })
+  @ApiParam({ name: 'id' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Sponsor deleted successfully.' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Sponsor not found.' })
+  deleteSponsor(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.deleteSponsor(id);
+  }
+  @Delete('organizations/:id')
+  @ApiOperation({ summary: 'Delete an organization' })
+  @ApiParam({ name: 'id' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Organization deleted successfully.' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Organization not found.' })
+  deleteOrganization(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.deleteOrganization(id);
+  } 
 }
