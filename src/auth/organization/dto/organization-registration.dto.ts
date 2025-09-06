@@ -20,7 +20,7 @@ import { Type } from 'class-transformer';
 import { Sector, BranchType } from 'src/common/enums';
 import { IsPhone } from 'src/common/validators/is-phone.validator';
 import { PasswordDto } from 'src/auth/dto/password.dto';
-import { Transform } from 'class-transformer'; 
+import { Transform } from 'class-transformer';
 
 
 /**
@@ -77,7 +77,7 @@ export class OrganizationRegistrationDto extends PasswordDto {
   @IsNumber({}, { message: 'Year of establishment must be a number' })
   @Type(() => Number)
   @Min(1200, { message: 'Year of establishment seems too old' })
-  @Max(new Date().getFullYear(), { message: 'Year of establishment cannot be in the future' }) 
+  @Max(new Date().getFullYear(), { message: 'Year of establishment cannot be in the future' })
   yearsOfEstablishment: number;
 
   @ApiProperty({
@@ -107,7 +107,7 @@ export class OrganizationRegistrationDto extends PasswordDto {
     enum: Sector,
     isArray: true,
   })
-    @Transform(({ value }) => {
+  @Transform(({ value }) => {
     if (typeof value === 'string') {
       return value.split(',').map(item => item.trim());
     }
@@ -124,7 +124,7 @@ export class OrganizationRegistrationDto extends PasswordDto {
     example: 'Renewable Energy',
     maxLength: 100,
   })
-  
+
   // FIX: Added conditional validation. This field is now required if Sector.OTHERS is selected.
   @ValidateIf((o) => o.sectorsYouWorkIn?.includes(Sector.OTHERS))
   @IsNotEmpty({ message: 'Other sectors cannot be empty when "Others" is selected' })
@@ -175,7 +175,7 @@ export class OrganizationRegistrationDto extends PasswordDto {
   @MaxLength(100)
   location: string;
 
-    @ApiProperty({
+  @ApiProperty({
     description: 'Organization logo file (JPG, PNG). Required.',
     type: 'string',
     format: 'binary',

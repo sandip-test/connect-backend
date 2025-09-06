@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Sector, BranchType } from 'src/common/enums';
 import { User } from 'src/modules/user/entity/user.entity';
-
+import { Event } from 'src/modules/event/entity/event.entity';
 /**
  * Organization Entity
  * Represents organizations registered in the system and its relationship with the User entity
@@ -76,6 +76,12 @@ export class Organization {
 
   // Relationships between Organization and User
   @OneToOne(() => User, (user) => user.organization)
-  @JoinColumn({ name: 'user_id' }) 
+  @JoinColumn({ name: 'user_id' })
   user: User;
+
+  //Relationsship between Organization and Event 
+  @OneToMany(() => Event, (event) => event.organization, {
+    nullable: true,
+  })
+  events?: Event[];
 }

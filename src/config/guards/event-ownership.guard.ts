@@ -27,6 +27,9 @@ export class EventOwnerGuard implements CanActivate {
             throw new NotFoundException(`Event with ID "${eventId}" not found.`);
         }
 
+        // Attach the event to the request object
+        request.event = event;
+
         // Fetch user data to get organization info
         const userData = await this.userService.findById(user.id);
         const userOrg = userData?.organization;

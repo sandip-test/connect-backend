@@ -7,6 +7,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { UploadModule } from 'src/config/upload/upload.module';
 import { AdminModule } from 'src/modules/admin/admin.module';
 import { UserModule } from 'src/modules/user/user.module';
+import { EventModule } from 'src/modules/event/event.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserModule } from 'src/modules/user/user.module';
     AuthModule,
     UserModule,
     AdminModule,
+    EventModule
   ],  controllers: [AppController],
   providers: [AppService],
 })

@@ -38,7 +38,7 @@ export class User {
   updatedAt: Date;
 
   // --- Relationships ---
-  @OneToOne(() => Organization, (organization) => organization.user, {
+  @OneToOne(() => Organization, (organization)=>organization.user, {
     cascade: true,
     nullable: true,
   })
