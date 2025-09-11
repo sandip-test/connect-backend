@@ -14,7 +14,7 @@ export class EventOwnerGuard implements CanActivate {
     constructor(
         private readonly eventService: EventService,
         private readonly userService: UserService
-    ) {}
+    ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
@@ -31,11 +31,9 @@ export class EventOwnerGuard implements CanActivate {
         request.event = event;
 
         // Fetch user data to get organization info
-        const userData = await this.userService.findById(user.id);
-        const userOrg = userData?.organization;
 
         // Allow admins OR the event's owning org
-        if (user.role === Role.ADMIN || event.organization === userOrg) {
+        if (user.role === Role.ADMIN || event.organization === user.organization) {
             return true;
         }
 

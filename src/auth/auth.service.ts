@@ -42,7 +42,7 @@ export class AuthService {
       throw new UnauthorizedException('Your account has not been verified by an administrator yet.');
     }
 
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { email: user.email, sub: user.id, role: user.role , organization :user.organization?.id};
     this.logger.log(`User logged in successfully: ${user.email}`);
 
     return {

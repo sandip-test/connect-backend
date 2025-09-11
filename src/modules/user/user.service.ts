@@ -8,7 +8,7 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   /**
    * Finds a user by their email address.
@@ -16,7 +16,7 @@ export class UserService {
    * @returns The user if found, otherwise null.
    */
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({ where: { email }, relations: ['organization'] });
   }
 
   /**
